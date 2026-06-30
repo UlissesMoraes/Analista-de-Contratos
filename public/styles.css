@@ -21,6 +21,10 @@
 
 * { box-sizing: border-box; }
 
+/* Garante que o atributo [hidden] sempre esconda o elemento, mesmo quando há
+   regra de display (ex.: .loading-card { display:flex }) que venceria a do navegador. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;

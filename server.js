@@ -42,8 +42,11 @@ app.post('/api/analisar', upload.array('contratos', 10), async (req, res) => {
 
     // Arquivos enviados
     for (const file of req.files || []) {
-      const texto = await extractText(file.buffer, file.originalname);
-      documentos.push({ nome: file.originalname, texto });
+      // O multer decodifica o nome como latin1; reinterpretar como UTF-8 corrige
+      // acentos/caracteres especiais (ex.: "2Âº" -> "2º").
+      const nome = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      const texto = await extractText(file.buffer, nome);
+      documentos.push({ nome, texto });
     }
 
     // Texto colado (opcional)
