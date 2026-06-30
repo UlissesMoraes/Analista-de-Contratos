@@ -1,0 +1,22 @@
+{
+  "name": "analista-de-contratos",
+  "version": "1.0.0",
+  "description": "Analista de Contratos com IA — análise jurídica executiva de contratos (PDF, Word, texto) com matriz de riscos, obrigações, prazos, seguros, penalidades e dashboard executivo.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mammoth": "^1.8.0",
+    "multer": "^2.2.0",
+    "pdf-parse": "^1.1.1"
+  }
+}
