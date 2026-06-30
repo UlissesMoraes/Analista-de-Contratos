@@ -24,7 +24,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     model: MODEL,
-    apiKeyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+    apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
   });
 });
 
@@ -83,8 +83,8 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n  Analista de Contratos rodando em http://localhost:${PORT}`);
   console.log(`  Modelo: ${MODEL}`);
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('  ⚠  ANTHROPIC_API_KEY não configurada — defina antes de analisar.\n');
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn('  ⚠  OPENAI_API_KEY não configurada — defina antes de analisar.\n');
   } else {
     console.log('');
   }

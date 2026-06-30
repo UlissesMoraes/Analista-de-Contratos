@@ -1,6 +1,6 @@
 'use strict';
 
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const {
   SYSTEM_PROMPT,
   buildUserPrompt,
@@ -9,57 +9,73 @@ const {
 } = require('./prompt');
 const { ANALYSIS_SCHEMA, COMPARISON_SCHEMA } = require('./schema');
 
-const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-4-8';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+const REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || null;
 
 let client = null;
 function getClient() {
   if (!client) {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY não configurada. Defina a variável de ambiente (veja .env.example).');
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY não configurada. Defina a variável de ambiente (veja .env.example).');
     }
-    client = new Anthropic();
+    client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_BASE_URL || undefined,
+      timeout: 10 * 60 * 1000, // 10 min para contratos longos
+    });
   }
   return client;
 }
 
-/** Extrai o JSON da resposta estruturada (primeiro bloco de texto). */
-function parseStructured(message) {
-  const block = message.content.find((b) => b.type === 'text');
-  if (!block) throw new Error('Resposta da IA sem conteúdo de texto.');
+/**
+ * Executa uma chamada com saída estruturada (JSON Schema strict) e devolve o objeto.
+ */
+async function structuredCall({ system, user, schema, schemaName, maxTokens }) {
+  const openai = getClient();
+
+  const params = {
+    model: MODEL,
+    max_completion_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: { name: schemaName, strict: true, schema },
+    },
+  };
+  // reasoning_effort só é aceito por modelos de raciocínio (o-series / gpt-5)
+  if (REASONING_EFFORT) params.reasoning_effort = REASONING_EFFORT;
+
+  const completion = await openai.chat.completions.create(params);
+  const msg = completion.choices && completion.choices[0] && completion.choices[0].message;
+  if (!msg) throw new Error('Resposta vazia da OpenAI.');
+  if (msg.refusal) {
+    throw new Error('A IA recusou a análise deste documento: ' + msg.refusal);
+  }
+  if (completion.choices[0].finish_reason === 'length') {
+    throw new Error('A resposta foi truncada (limite de tokens). Tente um contrato menor ou um modelo com saída maior.');
+  }
   try {
-    return JSON.parse(block.text);
+    return JSON.parse(msg.content);
   } catch (e) {
     throw new Error('Não foi possível interpretar a resposta da IA como JSON: ' + e.message);
   }
 }
 
-/**
- * Analisa um único contrato e retorna a análise estruturada.
- * Usa streaming para acomodar respostas longas sem timeout.
- */
+/** Analisa um único contrato e retorna a análise estruturada. */
 async function analyzeContract(contractText, contractName) {
   if (!contractText || !contractText.trim()) {
     throw new Error('O documento está vazio ou não foi possível extrair texto.');
   }
-
-  const anthropic = getClient();
-  const stream = anthropic.messages.stream({
-    model: MODEL,
-    max_tokens: 32000,
-    thinking: { type: 'adaptive' },
-    output_config: {
-      effort: 'high',
-      format: { type: 'json_schema', schema: ANALYSIS_SCHEMA },
-    },
+  return structuredCall({
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: buildUserPrompt(contractText, contractName) }],
+    user: buildUserPrompt(contractText, contractName),
+    schema: ANALYSIS_SCHEMA,
+    schemaName: 'analise_contrato',
+    maxTokens: 16000,
   });
-
-  const message = await stream.finalMessage();
-  if (message.stop_reason === 'refusal') {
-    throw new Error('A IA recusou a análise deste documento por questões de segurança.');
-  }
-  return parseStructured(message);
 }
 
 /**
@@ -70,25 +86,13 @@ async function compareContracts(analyses) {
   if (!analyses || analyses.length < 2) {
     throw new Error('A comparação exige pelo menos dois contratos.');
   }
-
-  const anthropic = getClient();
-  const stream = anthropic.messages.stream({
-    model: MODEL,
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    output_config: {
-      effort: 'high',
-      format: { type: 'json_schema', schema: COMPARISON_SCHEMA },
-    },
+  return structuredCall({
     system: COMPARISON_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: buildComparisonPrompt(analyses) }],
+    user: buildComparisonPrompt(analyses),
+    schema: COMPARISON_SCHEMA,
+    schemaName: 'comparacao_contratos',
+    maxTokens: 8000,
   });
-
-  const message = await stream.finalMessage();
-  if (message.stop_reason === 'refusal') {
-    throw new Error('A IA recusou a comparação por questões de segurança.');
-  }
-  return parseStructured(message);
 }
 
 module.exports = { analyzeContract, compareContracts, MODEL };

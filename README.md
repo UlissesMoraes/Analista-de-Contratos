@@ -1,6 +1,6 @@
 # ⚖️ Analista de Contratos (IA Jurídica)
 
-Aplicação web que analisa contratos (PDF, Word ou texto) com um **advogado corporativo sênior de IA** (Claude / Anthropic) e produz uma análise jurídica executiva completa: resumo, matriz de riscos, obrigações, prazos, análise financeira, penalidades, seguros, responsabilidades, pontos críticos, checklist operacional, cláusulas suspeitas, recomendações, dashboard executivo e comparação entre contratos.
+Aplicação web que analisa contratos (PDF, Word ou texto) com um **advogado corporativo sênior de IA** (OpenAI / GPT) e produz uma análise jurídica executiva completa: resumo, matriz de riscos, obrigações, prazos, análise financeira, penalidades, seguros, responsabilidades, pontos críticos, checklist operacional, cláusulas suspeitas, recomendações, dashboard executivo e comparação entre contratos.
 
 ## ✨ Funcionalidades
 
@@ -34,7 +34,7 @@ npm install
 
 # 2. Configurar a chave da API
 cp .env.example .env
-#   edite .env e defina ANTHROPIC_API_KEY=sk-ant-...
+#   edite .env e defina OPENAI_API_KEY=sk-...
 
 # 3. Iniciar
 npm start
@@ -42,7 +42,7 @@ npm start
 
 Acesse **http://localhost:3000**, arraste os contratos e clique em **Analisar**.
 
-> Alternativa de autenticação: em vez do `.env`, você pode exportar `ANTHROPIC_API_KEY` no ambiente, ou usar um perfil do `ant auth login` — o SDK resolve as credenciais automaticamente.
+> Alternativa: em vez do `.env`, você pode exportar `OPENAI_API_KEY` no ambiente. Para Azure OpenAI ou gateways compatíveis, defina `OPENAI_BASE_URL`.
 
 ## 🧱 Arquitetura
 
@@ -51,12 +51,13 @@ server.js              Servidor Express + rotas /api
 src/parser.js          Extração de texto (pdf-parse, mammoth, txt)
 src/prompt.js          Prompt mestre (persona de advogado sênior)
 src/schema.js          Esquema JSON da análise (saída estruturada)
-src/analyzer.js        Chamada à API Claude (Opus 4.8, structured outputs)
+src/analyzer.js        Chamada à API OpenAI (Chat Completions + JSON Schema strict)
 public/                Front-end (HTML + CSS + JS, sem build)
 ```
 
-- **Modelo:** `claude-opus-4-8` (configurável via `CLAUDE_MODEL`), com *adaptive thinking*, *effort high* e **saída estruturada** (`output_config.format`) garantindo JSON válido.
-- **Streaming** é usado para acomodar respostas longas sem timeout.
+- **Modelo:** `gpt-4o` por padrão (configurável via `OPENAI_MODEL` — ex.: `gpt-4.1` para contratos longos, `gpt-5`/`o3`/`o4-mini` para raciocínio).
+- **Saída estruturada** via `response_format: json_schema` com `strict: true`, garantindo JSON válido que nunca quebra a interface.
+- Para modelos de raciocínio, defina `OPENAI_REASONING_EFFORT` (`low`/`medium`/`high`).
 
 ## ⚠️ Aviso
 
